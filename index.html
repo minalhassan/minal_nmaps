@@ -1011,6 +1011,7 @@ nav { display: flex; gap: 4px; flex-wrap: wrap; }
       <button class="nav-btn" onclick="showSection('learning', this)">📚 Learn</button>
       <button class="nav-btn" onclick="showSection('lab', this)">🧪 Lab</button>
       <button class="nav-btn" onclick="showSection('quiz', this)">🎮 Quiz</button>
+      <button class="nav-btn" onclick="showSection('subnet', this)">🧮 Subnet Calc</button>
     </nav>
   </div>
 </header>
@@ -1164,6 +1165,47 @@ nav { display: flex; gap: 4px; flex-wrap: wrap; }
 
   <div style="margin-top:16px;">
     <button class="btn btn-primary" onclick="runBuiltCmd()" style="margin-right:10px;">▶ Run in Terminal</button>
+  </div>
+</div>
+
+<!-- ===== SUBNET CALCULATOR ===== -->
+<div class="section" id="sec-subnet">
+  <div class="section-title">// SUBNET CALCULATOR</div>
+  <div class="section-sub">> calculate network boundaries and subnet masks</div>
+
+  <div class="builder-grid">
+    <div class="builder-card">
+      <label>IP ADDRESS</label>
+      <input class="builder-input" id="subIp" placeholder="10.35.62.230" oninput="calculateSubnet()">
+      <div class="validation-msg" id="subIpMsg"></div>
+    </div>
+    <div class="builder-card">
+      <label>CIDR PREFIX (/)</label>
+      <input class="builder-input" type="number" id="subCidr" placeholder="24" min="0" max="32" oninput="calculateSubnet()">
+    </div>
+  </div>
+
+  <div class="built-command" style="display: block;">
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="color:var(--text2); font-size:0.75rem; font-family:'Share Tech Mono',monospace;">SUBNET MASK</span>
+      <span id="resMask" style="color:var(--green); font-family:'Share Tech Mono',monospace;">-</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="color:var(--text2); font-size:0.75rem; font-family:'Share Tech Mono',monospace;">NETWORK ADDRESS</span>
+      <span id="resNet" style="color:var(--green); font-family:'Share Tech Mono',monospace;">-</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="color:var(--text2); font-size:0.75rem; font-family:'Share Tech Mono',monospace;">BROADCAST ADDRESS</span>
+      <span id="resBcast" style="color:var(--green); font-family:'Share Tech Mono',monospace;">-</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+      <span style="color:var(--text2); font-size:0.75rem; font-family:'Share Tech Mono',monospace;">USABLE HOST RANGE</span>
+      <span id="resRange" style="color:var(--green); font-family:'Share Tech Mono',monospace;">-</span>
+    </div>
+    <div style="display:flex; justify-content:space-between;">
+      <span style="color:var(--text2); font-size:0.75rem; font-family:'Share Tech Mono',monospace;">TOTAL USABLE HOSTS</span>
+      <span id="resHosts" style="color:var(--green); font-family:'Share Tech Mono',monospace;">0</span>
+    </div>
   </div>
 </div>
 
@@ -2098,6 +2140,65 @@ function restartQuiz() {
 }
 
 renderQuiz();
+
+// ===================================================
+// SUBNET CALCULATOR
+// ===================================================
+function calculateSubnet() {
+  const ipStr = document.getElementById('subIp').value.trim();
+  const cidrStr = document.getElementById('subCidr').value.trim();
+  const msg = document.getElementById('subIpMsg');
+  
+  if (!ipStr || !cidrStr) return;
+
+  const ipRx = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const match = ipStr.match(ipRx);
+  if (!match) {
+    msg.textContent = '✗ Invalid IP format';
+    msg.className = 'validation-msg invalid';
+    return;
+  }
+  
+  const octets = match.slice(1, 5).map(Number);
+  if (octets.some(o => o < 0 || o > 255)) {
+    msg.textContent = '✗ Octet out of range (0-255)';
+    msg.className = 'validation-msg invalid';
+    return;
+  }
+  
+  const cidr = parseInt(cidrStr, 10);
+  if (isNaN(cidr) || cidr < 0 || cidr > 32) {
+    msg.textContent = '✗ Invalid CIDR (0-32)';
+    msg.className = 'validation-msg invalid';
+    return;
+  }
+
+  msg.textContent = '✓ Valid IP';
+  msg.className = 'validation-msg valid';
+
+  function ipToInt(o) { return (o[0] << 24) | (o[1] << 16) | (o[2] << 8) | (o[3]); }
+  function intToIp(int) { return [(int >>> 24) & 255, (int >>> 16) & 255, (int >>> 8) & 255, int & 255].join('.'); }
+
+  const maskInt = cidr === 0 ? 0 : ~((1 << (32 - cidr)) - 1);
+  const ipInt = ipToInt(octets);
+  const netInt = ipInt & maskInt;
+  const bcastInt = netInt | (~maskInt);
+
+  document.getElementById('resMask').textContent = intToIp(maskInt);
+  document.getElementById('resNet').textContent = intToIp(netInt);
+  document.getElementById('resBcast').textContent = intToIp(bcastInt);
+  
+  if (cidr === 32) {
+    document.getElementById('resRange').textContent = 'N/A (Single Host)';
+    document.getElementById('resHosts').textContent = '1';
+  } else if (cidr === 31) {
+    document.getElementById('resRange').textContent = `${intToIp(netInt)} - ${intToIp(bcastInt)} (Point-to-Point)`;
+    document.getElementById('resHosts').textContent = '2';
+  } else {
+    document.getElementById('resRange').textContent = `${intToIp(netInt + 1)} - ${intToIp(bcastInt - 1)}`;
+    document.getElementById('resHosts').textContent = (Math.pow(2, 32 - cidr) - 2).toString();
+  }
+}
 
 // Initial terminal welcome
 setTimeout(() => {
